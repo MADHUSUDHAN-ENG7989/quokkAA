@@ -1,0 +1,70 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  --font-family: 'Outfit', system-ui, -apple-system, sans-serif;
+
+  /* Deep Sea Professional Palette */
+  --bg-dark: hsl(220, 25%, 7%);
+  --bg-sidebar: hsl(220, 25%, 5%);
+  --bg-card: hsl(220, 20%, 12%);
+  --bg-input: hsl(220, 20%, 15%);
+
+  --text-primary: hsl(210, 20%, 95%);
+  --text-secondary: hsl(210, 15%, 70%);
+  --text-tertiary: hsl(210, 10%, 45%);
+
+  --accent-cyan: hsl(180, 100%, 50%);
+  --accent-blue: hsl(210, 100%, 60%);
+  --accent-glow: hsla(180, 100%, 50%, 0.15);
+
+  --border-dim: hsla(210, 20%, 100%, 0.08);
+  --border-bright: hsla(210, 20%, 100%, 0.15);
+
+  --danger: hsl(0, 85%, 60%);
+  --success: hsl(145, 80%, 45%);
+
+  --glass-bg: hsla(220, 25%, 10%, 0.7);
+  --glass-blur: blur(12px);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.sources-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.source-item {
+  background-color: var(--card-bg);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  color: #94a3b8;
+  border: 1px solid var(--border-color);
+  word-break: break-all;
+  max-width: 100%;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  line-height: 1.6;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+}
