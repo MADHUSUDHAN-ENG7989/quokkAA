@@ -1,6 +1,6 @@
 import requests
 
-url = "http://localhost:8000/api/chat_stream"
+url = "https://quokka-backend.onrender.com/api/chat_stream"
 payload = {
     "query": "What is the atomic weight of silicon?",
     "model": "hybrid"

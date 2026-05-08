@@ -1029,11 +1029,11 @@ function ApiModal({ onClose }) {
   const snippets = [
     {
       lang: "Python SDK",
-      code: `import requests\n\nurl = "https://quokka-backend.render.com/api/chat_stream"\npayload = {\n    "query": "What is the atomic weight of silicon?",\n    "model": "hybrid"\n}\nres = requests.post(url, json=payload, stream=True)\nfor chunk in res.iter_lines():\n    print(chunk.decode())`
+      code: `import requests\n\nurl = "https://quokka-backend.onrender.com/api/chat_stream"\npayload = {\n    "query": "What is the atomic weight of silicon?",\n    "model": "hybrid"\n}\nres = requests.post(url, json=payload, stream=True)\nfor chunk in res.iter_lines():\n    print(chunk.decode())`
     },
     {
       lang: "cURL CLI",
-      code: `curl -X POST https://quokka-backend.render.com/api/chat_stream \\\n  -H "Content-Type: application/json" \\\n  -d '{"query": "What is silicon?", "model": "qdrant"}'`
+      code: `curl -X POST https://quokka-backend.onrender.com/api/chat_stream \\\n  -H "Content-Type: application/json" \\\n  -d '{"query": "What is silicon?", "model": "qdrant"}'`
     }
   ];
 
