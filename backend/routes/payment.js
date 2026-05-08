@@ -26,8 +26,8 @@ router.post('/orders', verifyToken, async (req, res) => {
         }
         res.json(order);
     } catch (err) {
-        console.error('Razorpay Order Creation Error:', err.message);
-        res.status(500).json({ error: 'Failed to initiate payment gateway' });
+        console.error('Razorpay Order Creation Error:', err);
+        res.status(500).json({ error: 'Failed to initiate payment gateway: ' + (err.message || JSON.stringify(err)) });
     }
 });
 
