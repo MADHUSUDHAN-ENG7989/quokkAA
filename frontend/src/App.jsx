@@ -14,29 +14,93 @@ import { motion, AnimatePresence } from 'framer-motion';
 const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
 function App() {
-  // Guard: show admin page full screen if requested
+  const [theme, setTheme] = useState(() => {
+    return localStorage.getItem('quokka_theme') || 'dark';
+  });
+  const [readingMode, setReadingMode] = useState(() => {
+    const saved = localStorage.getItem('quokka_reading_mode');
+    if (saved === 'true') return 2; // Default to standard medium if it was boolean true
+    if (saved === 'false' || !saved) return 0;
+    const parsed = parseInt(saved, 10);
+    return isNaN(parsed) ? 0 : parsed;
+  });
+
+  useEffect(() => {
+    if (theme === 'light') {
+      document.body.classList.add('light-mode');
+    } else {
+      document.body.classList.remove('light-mode');
+    }
+    localStorage.setItem('quokka_theme', theme);
+  }, [theme]);
+
+  useEffect(() => {
+    document.body.classList.remove('reading-mode-1', 'reading-mode-2', 'reading-mode-3');
+    if (readingMode > 0) {
+      document.body.classList.add(`reading-mode-${readingMode}`);
+    }
+    localStorage.setItem('quokka_reading_mode', readingMode.toString());
+  }, [readingMode]);
+
   const { user, token, isLimitReached, incrementQueryCount, logout } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [showAdmin, setShowAdmin] = useState(false);
-  const [windows, setWindows] = useState(() => {
-    const saved = localStorage.getItem('quokka_windows');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', title: 'New Chat', messages: [], isLoading: false }
-    ];
-  });
-
-  const [activeWindowId, setActiveWindowId] = useState(() => {
-    const savedId = localStorage.getItem('quokka_active_window_id');
-    // Ensure the saved ID actually exists in the current windows
-    const saved = localStorage.getItem('quokka_windows');
-    if (savedId && saved) {
-      const parsed = JSON.parse(saved);
-      if (parsed.some(w => w.id === savedId)) return savedId;
+  
+  const [windows, setWindows] = useState([]);
+  const [activeWindowId, setActiveWindowId] = useState('');
+  const [guestId, setGuestId] = useState(() => {
+    let id = localStorage.getItem('quokka_guest_id');
+    if (!id) {
+      id = 'g_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+      localStorage.setItem('quokka_guest_id', id);
     }
-    return windows[0]?.id || '1';
+    return id;
   });
 
-  const [selectedModel, setSelectedModel] = useState('rag'); // 'rag' or 'finetuned'
+  const [editingChatId, setEditingChatId] = useState(null);
+  const [editTitleInput, setEditTitleInput] = useState('');
+
+  // Fetch chats from MongoDB on load or login/logout
+  useEffect(() => {
+    const fetchChats = async () => {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        } else {
+          headers['x-guest-id'] = guestId;
+        }
+
+        const res = await fetch(`${API}/api/chats`, { headers });
+        const data = await res.json();
+        
+        if (Array.isArray(data)) {
+          const loadedWindows = data.map(w => ({
+            id: w._id,
+            title: w.title,
+            messages: w.messages || [],
+            isLoading: false,
+            model: w.model || 'rag'
+          }));
+
+          const newId = 'temp_' + Date.now().toString();
+          const newWindow = { id: newId, title: 'New Chat', messages: [], isLoading: false, model: 'rag' };
+
+          setWindows([newWindow, ...loadedWindows]);
+          setActiveWindowId(newId);
+        }
+      } catch (e) {
+        console.error("Error fetching chats from MongoDB:", e);
+        const newId = 'temp_' + Date.now().toString();
+        setWindows([{ id: newId, title: 'New Chat', messages: [], isLoading: false, model: 'rag' }]);
+        setActiveWindowId(newId);
+      }
+    };
+
+    fetchChats();
+  }, [token, guestId]);
+
+  const [selectedModel, setSelectedModel] = useState('rag'); // 'rag', 'qdrant', or 'finetuned'
   const [showModelMenu, setShowModelMenu] = useState(false);
   const modelMenuRef = useRef(null);
 
@@ -57,13 +121,7 @@ function App() {
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
-  const activeWindow = windows.find(w => w.id === activeWindowId) || windows[0];
-
-  // Sync to LocalStorage whenever state changes
-  useEffect(() => {
-    localStorage.setItem('quokka_windows', JSON.stringify(windows.map(w => ({ ...w, isLoading: false }))));
-    localStorage.setItem('quokka_active_window_id', activeWindowId);
-  }, [windows, activeWindowId]);
+  const activeWindow = windows.find(w => w.id === activeWindowId) || windows[0] || { messages: [], isLoading: false };
 
   const scrollToBottom = (instant = false) => {
     if (shouldAutoScroll) {
@@ -72,8 +130,10 @@ function App() {
   };
 
   useEffect(() => {
-    scrollToBottom();
-  }, [activeWindow.messages, activeWindow.isLoading]);
+    if (activeWindow && activeWindow.messages) {
+      scrollToBottom();
+    }
+  }, [activeWindow?.messages, activeWindow?.isLoading]);
 
   // Handle manual scroll to disable auto-scroll if user moves up
   const handleScroll = () => {
@@ -84,13 +144,18 @@ function App() {
   };
 
   const createNewWindow = () => {
-    const newId = Date.now().toString();
-    const newWindow = { id: newId, title: 'New Chat', messages: [], isLoading: false };
+    const existingTemp = windows.find(w => w.id.startsWith('temp_'));
+    if (existingTemp) {
+      setActiveWindowId(existingTemp.id);
+      setInput('');
+      return;
+    }
+
+    const newId = 'temp_' + Date.now().toString();
+    const newWindow = { id: newId, title: 'New Chat', messages: [], isLoading: false, model: 'rag' };
     setWindows(prev => [newWindow, ...prev]);
     setActiveWindowId(newId);
     setInput('');
-    
-    // 🎊 (Confetti removed as requested)
   };
 
   const switchWindow = (id) => {
@@ -98,41 +163,101 @@ function App() {
     setInput('');
   };
 
-  const closeWindow = (e, id) => {
-    e.stopPropagation(); // Don't switch to tab when closing it
+  const closeWindow = async (e, id) => {
+    e.stopPropagation();
 
-    setWindows(prev => {
-      const remaining = prev.filter(w => w.id !== id);
+    if (id.startsWith('temp_')) {
+      setWindows(prev => {
+        const remaining = prev.filter(w => w.id !== id);
+        if (remaining.length === 0) {
+          const newId = 'temp_' + Date.now().toString();
+          setActiveWindowId(newId);
+          return [{ id: newId, title: 'New Chat', messages: [], isLoading: false, model: 'rag' }];
+        }
+        if (id === activeWindowId) {
+          setActiveWindowId(remaining[0].id);
+        }
+        return remaining;
+      });
+      return;
+    }
 
-      // If we closed the last tab, create a new fresh one immediately
-      if (remaining.length === 0) {
-        const newId = Date.now().toString();
-        const newWindow = { id: newId, title: 'New Chat', messages: [], isLoading: false };
-        setActiveWindowId(newId);
-        return [newWindow];
-      }
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else headers['x-guest-id'] = guestId;
 
-      // If we closed the active tab, switch to the first remaining one
-      if (id === activeWindowId) {
-        setActiveWindowId(remaining[0].id);
-      }
+      await fetch(`${API}/api/chats/${id}`, {
+        method: 'DELETE',
+        headers
+      });
 
-      return remaining;
-    });
+      setWindows(prev => {
+        const remaining = prev.filter(w => w.id !== id);
+        if (remaining.length === 0) {
+          const newId = 'temp_' + Date.now().toString();
+          setActiveWindowId(newId);
+          return [{ id: newId, title: 'New Chat', messages: [], isLoading: false, model: 'rag' }];
+        }
+        if (id === activeWindowId) {
+          setActiveWindowId(remaining[0].id);
+        }
+        return remaining;
+      });
+    } catch (err) {
+      console.error("Error deleting chat session:", err);
+    }
   };
 
-  const clearAllWindows = () => {
+  const renameChat = async (id, newTitle) => {
+    if (!newTitle.trim()) return;
+    try {
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+      else headers['x-guest-id'] = guestId;
+
+      const chat = windows.find(w => w.id === id);
+      await fetch(`${API}/api/chats/${id}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({
+          title: newTitle.trim(),
+          messages: chat.messages,
+          model: chat.model || selectedModel
+        })
+      });
+
+      setWindows(prev => prev.map(w => w.id === id ? { ...w, title: newTitle.trim() } : w));
+      setEditingChatId(null);
+    } catch (err) {
+      console.error("Error renaming chat:", err);
+    }
+  };
+
+  const clearAllWindows = async () => {
     if (window.confirm("Are you sure you want to clear all chat sessions? This cannot be undone.")) {
-      const newId = Date.now().toString();
-      const freshWindow = { id: newId, title: 'New Chat', messages: [], isLoading: false };
-      setWindows([freshWindow]);
-      setActiveWindowId(newId);
-      localStorage.clear();
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        else headers['x-guest-id'] = guestId;
+
+        await fetch(`${API}/api/chats`, {
+          method: 'DELETE',
+          headers
+        });
+
+        const newId = 'temp_' + Date.now().toString();
+        const freshWindow = { id: newId, title: 'New Chat', messages: [], isLoading: false, model: 'rag' };
+        setWindows([freshWindow]);
+        setActiveWindowId(newId);
+      } catch (err) {
+        console.error("Error clearing chats:", err);
+      }
     }
   };
 
   const exportCurrentChat = () => {
-    if (activeWindow.messages.length === 0) return;
+    if (!activeWindow || !activeWindow.messages || activeWindow.messages.length === 0) return;
 
     let mdContent = `# Quokka Research Session: ${activeWindow.title}\n\n`;
     activeWindow.messages.forEach(msg => {
@@ -170,9 +295,8 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!input.trim() || activeWindow.isLoading) return;
+    if (!activeWindow || !input.trim() || activeWindow.isLoading) return;
 
-    // Check free query limit
     if (isLimitReached) {
       setShowAuth(true);
       return;
@@ -181,13 +305,15 @@ function App() {
     const userQuery = input.trim();
     setInput('');
 
+    let currentSessionId = activeWindowId;
+    let isNewChat = activeWindowId.startsWith('temp_');
+
     // Typing effect buffer 🗒️
     let typingBuffer = "";
     let isTyping = false;
 
     const processTyping = () => {
       if (typingBuffer.length > 0) {
-        // Extreme Speed: Up to 10 characters per cycle if needed! ⚡⚡⚡
         let batchSize = 1;
         if (typingBuffer.length > 200) batchSize = 10;
         else if (typingBuffer.length > 100) batchSize = 6;
@@ -198,7 +324,7 @@ function App() {
         typingBuffer = typingBuffer.substring(batchSize);
         
         setWindows(prev => prev.map(w => {
-          if (w.id !== activeWindowId) return w;
+          if (w.id !== currentSessionId) return w;
           const newMsgs = [...w.messages];
           if (newMsgs.length === 0) return w;
           const lastMsg = { ...newMsgs[newMsgs.length - 1] };
@@ -208,7 +334,6 @@ function App() {
           return { ...w, messages: newMsgs };
         }));
 
-        // Minimal delay for maximum throughput
         const delay = typingBuffer.length > 50 ? 1 : 4; 
         setTimeout(processTyping, delay);
       } else {
@@ -216,26 +341,53 @@ function App() {
       }
     };
 
-    // Update title if it's the first message
-    const newTitle = activeWindow.messages.length === 0 ?
-      (userQuery.length > 20 ? userQuery.substring(0, 20) + '...' : userQuery) :
-      activeWindow.title;
+    const initialUserMessage = { role: 'user', content: userQuery, sources: [] };
+    let payloadHistory = [];
 
-    // Add user message to UI
-    const updatedMessages = [...activeWindow.messages, { role: 'user', content: userQuery }];
+    if (isNewChat) {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
 
-    setWindows(prev => prev.map(w =>
-      w.id === activeWindowId ? { ...w, messages: updatedMessages, isLoading: true, title: newTitle } : w
-    ));
+        const createRes = await fetch(`${API}/api/chats`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            guestId,
+            title: userQuery.length > 20 ? userQuery.substring(0, 20) + '...' : userQuery,
+            messages: [initialUserMessage],
+            model: selectedModel
+          })
+        });
+        const savedChat = await createRes.json();
+        if (savedChat._id) {
+          currentSessionId = savedChat._id;
+          setWindows(prev => prev.map(w => 
+            w.id === activeWindowId 
+              ? { ...w, id: savedChat._id, title: savedChat.title, messages: savedChat.messages, isLoading: true } 
+              : w
+          ));
+          setActiveWindowId(savedChat._id);
+        }
+      } catch (err) {
+        console.error("Error pre-creating chat in MongoDB:", err);
+        const updatedMessages = [initialUserMessage];
+        setWindows(prev => prev.map(w =>
+          w.id === activeWindowId ? { ...w, messages: updatedMessages, isLoading: true } : w
+        ));
+      }
+    } else {
+      payloadHistory = activeWindow.messages.map(msg => ({
+        role: msg.role === 'assistant' ? 'assistant' : 'user',
+        content: msg.content
+      }));
+      const updatedMessages = [...activeWindow.messages, initialUserMessage];
+      setWindows(prev => prev.map(w =>
+        w.id === activeWindowId ? { ...w, messages: updatedMessages, isLoading: true } : w
+      ));
+    }
 
-    // Increment query count for guests
     if (!user) incrementQueryCount();
-
-    const payloadHistory = activeWindow.messages.map(msg => ({
-      role: msg.role === 'assistant' ? 'assistant' : 'user',
-      content: msg.content
-    }));
-
 
     try {
       const authHeaders = token
@@ -256,11 +408,8 @@ function App() {
         throw new Error(`Server responded with ${response.status}`);
       }
 
-      // Add empty assistant message that we will stream into
       setWindows(prev => prev.map(w => {
-        if (w.id !== activeWindowId) return w;
-        // Ensure we don't add a new assistant message if the last one is already an assistant message
-        // (e.g., if the user spams submit before the first response comes back)
+        if (w.id !== currentSessionId) return w;
         if (w.messages.length > 0 && w.messages[w.messages.length - 1].role === 'assistant') {
           return w;
         }
@@ -275,7 +424,8 @@ function App() {
 
       let done = false;
       let fullAssistantContent = "";
-      let lineBuffer = ""; // Fix for partial lines! 🧩
+      let lineBuffer = "";
+      let finalSources = [];
 
       while (!done) {
         const { value, done: readerDone } = await reader.read();
@@ -286,7 +436,6 @@ function App() {
           lineBuffer += chunkStr;
 
           const lines = lineBuffer.split('\n');
-          // Keep the last (potentially partial) line in the buffer
           lineBuffer = lines.pop();
 
           for (const line of lines) {
@@ -298,8 +447,9 @@ function App() {
                 const data = JSON.parse(dataStr);
 
                 if (data.type === 'sources') {
+                  finalSources = data.sources;
                   setWindows(prev => prev.map(w => {
-                    if (w.id !== activeWindowId) return w;
+                    if (w.id !== currentSessionId) return w;
                     const newMsgs = [...w.messages];
                     const lastMsg = { ...newMsgs[newMsgs.length - 1] };
                     lastMsg.sources = data.sources;
@@ -322,8 +472,31 @@ function App() {
         }
       }
 
-      // If it was the first user message, generate a title using Groq
-      if (activeWindow.messages.length === 0) {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        else headers['x-guest-id'] = guestId;
+
+        const finalMessages = [
+          ...payloadHistory,
+          initialUserMessage,
+          { role: 'assistant', content: fullAssistantContent, sources: finalSources }
+        ];
+
+        await fetch(`${API}/api/chats/${currentSessionId}`, {
+          method: 'PUT',
+          headers,
+          body: JSON.stringify({
+            title: isNewChat ? (userQuery.length > 20 ? userQuery.substring(0, 20) + '...' : userQuery) : activeWindow.title,
+            messages: finalMessages,
+            model: selectedModel
+          })
+        });
+      } catch (syncErr) {
+        console.error("Error syncing chat to MongoDB:", syncErr);
+      }
+
+      if (isNewChat) {
         try {
           const titleResponse = await fetch(`${API}/api/generate_title`, {
             method: 'POST',
@@ -332,10 +505,28 @@ function App() {
           });
           const titleData = await titleResponse.json();
           if (titleData.title) {
-            setWindows(prev => prev.map(w => w.id === activeWindowId ? { ...w, title: titleData.title } : w));
+            setWindows(prev => prev.map(w => w.id === currentSessionId ? { ...w, title: titleData.title } : w));
+            
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+            else headers['x-guest-id'] = guestId;
+
+            const finalMessages = [
+              ...payloadHistory,
+              initialUserMessage,
+              { role: 'assistant', content: fullAssistantContent, sources: finalSources }
+            ];
+
+            await fetch(`${API}/api/chats/${currentSessionId}`, {
+              method: 'PUT',
+              headers,
+              body: JSON.stringify({
+                title: titleData.title,
+                messages: finalMessages,
+                model: selectedModel
+              })
+            });
           }
-          
-          // 🎊 (Confetti removed as requested)
         } catch (titleErr) {
           console.error("Error generating title:", titleErr);
         }
@@ -344,14 +535,14 @@ function App() {
     } catch (err) {
       console.error("Error querying the API:", err);
       setWindows(prev => prev.map(w => {
-        if (w.id !== activeWindowId) return w;
+        if (w.id !== currentSessionId) return w;
         return {
           ...w,
           messages: [...w.messages, { role: 'assistant', content: "Failed to fetch response.", isError: true }]
         };
       }));
     } finally {
-      updateActiveWindow({ isLoading: false });
+      setWindows(prev => prev.map(w => w.id === currentSessionId ? { ...w, isLoading: false } : w));
     }
   };
 
@@ -379,6 +570,8 @@ function App() {
   if (showAdmin && user?.role === 'admin') {
     return <AdminPage onBack={() => setShowAdmin(false)} />;
   }
+
+
 
   return (
     <div className="browser-layout">
@@ -410,10 +603,41 @@ function App() {
                 <div className="tab-icon">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" /></svg>
                 </div>
-                <span className="tab-title">{win.title}</span>
-                <button className="close-tab-btn" onClick={(e) => closeWindow(e, win.id)} title="Close Tab">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
-                </button>
+                {editingChatId === win.id ? (
+                  <input
+                    type="text"
+                    className="tab-title-input"
+                    value={editTitleInput}
+                    onChange={(e) => setEditTitleInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') renameChat(win.id, editTitleInput);
+                      else if (e.key === 'Escape') setEditingChatId(null);
+                    }}
+                    onBlur={() => renameChat(win.id, editTitleInput)}
+                    autoFocus
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <span className="tab-title">{win.title}</span>
+                )}
+                <div className="tab-actions-hover">
+                  {editingChatId !== win.id && (
+                    <button 
+                      className="edit-tab-btn" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingChatId(win.id);
+                        setEditTitleInput(win.title);
+                      }} 
+                      title="Rename Chat"
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" /></svg>
+                    </button>
+                  )}
+                  <button className="close-tab-btn" onClick={(e) => closeWindow(e, win.id)} title="Delete Chat">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>
+                  </button>
+                </div>
               </motion.div>
             ))}
           </AnimatePresence>
@@ -428,10 +652,13 @@ function App() {
       <main className="main-content">
         <header className="main-header">
           <div className="header-brand">
+
             <span className="brand-name">Quokka</span>
             <div className="model-selector" ref={modelMenuRef}>
               <button className="model-btn" onClick={() => setShowModelMenu(!showModelMenu)}>
-                <span className="model-name">{selectedModel === 'rag' ? 'RAG Expert' : 'Fine-tuned Qwen'}</span>
+                <span className="model-name">
+                  {selectedModel === 'rag' ? 'RAG Expert' : selectedModel === 'qdrant' ? 'Qdrant Live RAG' : selectedModel === 'hybrid' ? 'Hybrid Ensemble' : 'Fine-tuned Qwen'}
+                </span>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m6 9 6 6 6-6"/></svg>
               </button>
               
@@ -454,6 +681,28 @@ function App() {
                       </div>
                       <span className="option-desc">Uses retrieval-augmented generation for specialized scientific accuracy.</span>
                     </div>
+
+                    <div 
+                      className={`model-option ${selectedModel === 'qdrant' ? 'selected' : ''}`}
+                      onClick={() => { setSelectedModel('qdrant'); setShowModelMenu(false); }}
+                    >
+                      <div className="option-header">
+                        <span className="option-title">Qdrant Live RAG</span>
+                        {selectedModel === 'qdrant' && <span className="check-icon">✓</span>}
+                      </div>
+                      <span className="option-desc">Real-time web search and dynamic vector indexing on Qdrant Cloud.</span>
+                    </div>
+
+                    <div 
+                      className={`model-option ${selectedModel === 'hybrid' ? 'selected' : ''}`}
+                      onClick={() => { setSelectedModel('hybrid'); setShowModelMenu(false); }}
+                    >
+                      <div className="option-header">
+                        <span className="option-title">Hybrid Ensemble</span>
+                        {selectedModel === 'hybrid' && <span className="check-icon">✓</span>}
+                      </div>
+                      <span className="option-desc">Consensus engine that runs all 3 models in parallel and synthesizes the ultimate answer.</span>
+                    </div>
                     
                     <div 
                       className={`model-option ${selectedModel === 'finetuned' ? 'selected' : ''}`}
@@ -471,6 +720,44 @@ function App() {
             </div>
           </div>
           <div className="header-actions">
+            {/* Reading Mode Toggle */}
+            {/* Reading Mode Step Toggle */}
+            <button 
+              type="button"
+              className={`theme-toggle-btn reading-toggle-btn-step intensity-${readingMode}`} 
+              onClick={() => setReadingMode(prev => (prev + 1) % 4)} 
+              title={`Reading Mode: ${['Off', 'Low Intensity (Step 1)', 'Medium Intensity (Step 2)', 'High Intensity (Step 3)'][readingMode]}`}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" />
+                <path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" />
+              </svg>
+              <div className="backlight-indicator-bars">
+                <span className={`bar ${readingMode >= 1 ? 'lit' : ''}`}></span>
+                <span className={`bar ${readingMode >= 2 ? 'lit' : ''}`}></span>
+                <span className={`bar ${readingMode >= 3 ? 'lit' : ''}`}></span>
+              </div>
+            </button>
+
+            {/* Dark/Light Mode Toggle */}
+            <button 
+              type="button"
+              className="theme-toggle-btn" 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
+              title={theme === 'dark' ? "Switch to Light Mode" : "Switch to Dark Mode"}
+            >
+              {theme === 'dark' ? (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="12" cy="12" r="4" />
+                  <path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" /><path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+                </svg>
+              ) : (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+                </svg>
+              )}
+            </button>
+
             {user ? (
               <>
                 {user.role === 'admin' && (

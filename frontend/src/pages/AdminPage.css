@@ -1,8 +1,8 @@
 .admin-page {
     min-height: 100vh;
-    background: #0f1011;
-    color: #e8e8e8;
-    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg-dark);
+    color: var(--text-primary);
+    font-family: var(--font-family);
     display: flex;
     flex-direction: column;
 }
@@ -12,8 +12,9 @@
     align-items: center;
     justify-content: space-between;
     padding: 16px 28px;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
-    background: rgba(255,255,255,0.03);
+    border-bottom: 1px solid var(--border-dim);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
 }
 
 .admin-brand {
@@ -22,33 +23,37 @@
     gap: 10px;
     font-size: 17px;
     font-weight: 700;
-    color: #fff;
+    color: var(--text-primary);
 }
 
 .admin-back-btn {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.12);
-    color: rgba(255,255,255,0.7);
+    background: var(--bg-card);
+    border: 1px solid var(--border-bright);
+    color: var(--text-secondary);
     border-radius: 8px;
     padding: 7px 14px;
     font-size: 13px;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: all 0.2s;
 }
-.admin-back-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+.admin-back-btn:hover { 
+    background: var(--bg-input); 
+    color: var(--text-primary);
+    border-color: var(--accent-blue);
+}
 
 .admin-tabs {
     display: flex;
     gap: 4px;
     padding: 14px 28px 0;
-    border-bottom: 1px solid rgba(255,255,255,0.08);
+    border-bottom: 1px solid var(--border-dim);
 }
 
 .admin-tab {
     background: none;
     border: none;
     border-bottom: 2px solid transparent;
-    color: rgba(255,255,255,0.5);
+    color: var(--text-tertiary);
     font-size: 14px;
     font-weight: 600;
     padding: 8px 16px 12px;
@@ -56,10 +61,10 @@
     transition: all 0.2s;
 }
 .admin-tab.active {
-    color: #00b4d8;
-    border-bottom-color: #00b4d8;
+    color: var(--accent-blue);
+    border-bottom-color: var(--accent-blue);
 }
-.admin-tab:hover:not(.active) { color: rgba(255,255,255,0.8); }
+.admin-tab:hover:not(.active) { color: var(--text-primary); }
 
 .admin-body { padding: 28px; flex: 1; overflow-y: auto; }
 

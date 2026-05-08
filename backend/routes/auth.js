@@ -24,6 +24,14 @@ router.post('/register', async (req, res) => {
 
         const user = await User.create({ name, email, password });
         const token = signToken(user);
+
+        // Merge guest chats if guestId is provided
+        const { guestId } = req.body;
+        if (guestId) {
+            const ChatSession = require('../models/ChatSession');
+            await ChatSession.updateMany({ guestId, userId: null }, { $set: { userId: user._id, guestId: null } });
+        }
+
         res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
     } catch (e) {
         console.error('Register error:', e);
@@ -43,6 +51,14 @@ router.post('/login', async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password' });
 
         const token = signToken(user);
+
+        // Merge guest chats if guestId is provided
+        const { guestId } = req.body;
+        if (guestId) {
+            const ChatSession = require('../models/ChatSession');
+            await ChatSession.updateMany({ guestId, userId: null }, { $set: { userId: user._id, guestId: null } });
+        }
+
         res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
     } catch (e) {
         console.error('Login error:', e);
@@ -66,6 +82,14 @@ router.post('/google', async (req, res) => {
         }
 
         const token = signToken(user);
+
+        // Merge guest chats if guestId is provided
+        const { guestId } = req.body;
+        if (guestId) {
+            const ChatSession = require('../models/ChatSession');
+            await ChatSession.updateMany({ guestId, userId: null }, { $set: { userId: user._id, guestId: null } });
+        }
+
         res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, picture } });
     } catch (e) {
         console.error('Google auth error:', e);

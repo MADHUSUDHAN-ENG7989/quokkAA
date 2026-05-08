@@ -67,19 +67,46 @@ class RAGPipeline {
                 topK: 10,
                 includeMetadata: true
             });
-            docs = response.matches || [];
+            const allDocs = response.matches || [];
+            const RELEVANCE_THRESHOLD = 0.75;
+            docs = allDocs.filter(d => d.score >= RELEVANCE_THRESHOLD);
         } catch(e) {
             console.error("Error searching pinecone:", e);
         }
         
         console.log(`DEBUG: Found ${docs.length} relevant documents.`);
+        if (docs.length === 0) {
+            return {
+                answer: "I am sorry, but that question is out of the RAG context. Please ask a question related to the uploaded materials science datasets. 🧠🔬",
+                sources: []
+            };
+        }
+        
         const context = docs.map(d => d.metadata.text || "").join("\n\n");
         const sources = [...new Set(docs.map(d => (d.metadata && d.metadata.source) ? d.metadata.source : "Unknown"))];
         
         const messages = [
             {
                 role: "system",
-                content: "You are a BRILLIANT and SUPER FRIENDLY expert Material Scientist! 🧠✨ Your goal is to make scientific concepts feel alive! \n\nCRITICAL: You MUST use at least 5-8 relevant emojis (like 🧠, 🔬, 🚀, 📦, 👉, 📊) throughout your response. Use BOLD headers and bullet points for a premium look! 💎"
+                content: `You are a professional AI assistant for material science researchers.
+
+Instructions:
+- Answer exactly according to the user’s question depth.
+- Give concise answers for simple questions.
+- Give detailed, structured, technical explanations only when required.
+- Do not add unrelated information, assumptions, warnings, history, or extra context unless asked.
+- Prioritize accuracy, clarity, and relevance.
+- Use scientific terminology correctly but explain complex concepts simply when needed.
+- If the question is ambiguous, ask a short clarifying question before answering.
+- Prefer direct answers over long introductions.
+- Use bullet points, tables, equations, or stepwise explanations only when they improve understanding.
+- For research questions, include mechanisms, properties, equations, comparisons, applications, and limitations only if relevant.
+- Never hallucinate data, citations, or experimental results.
+- If unsure, clearly state uncertainty instead of guessing.
+- Maintain a professional and research-oriented tone.
+
+Retrieved Scientific Context to help answer the question:
+${context}`
             },
             {
                 role: "user",
@@ -106,8 +133,11 @@ class RAGPipeline {
             generated_text = generated_text.replace(/\[INTERNAL_KNOWLEDGE\]/g, "").trim();
             answer = `**Answer:**\n${generated_text}`;
         } catch (e) {
-            console.log(`LLM synthesis failed: ${e.message}. Falling back to raw RAG.`);
-            answer = `*(Notice: LLM Generator unavailable, showing raw RAG context below)*\n\n${context}`;
+            console.log(`LLM synthesis failed: ${e.message}.`);
+            const sourceList = sources.length > 0 
+                ? `\n\n**Relevant Reference Documents Found:**\n` + sources.map(s => `📄 *${s}*`).join('\n')
+                : '';
+            answer = `**AI Synthesis Service Offline** 🧠🔌\n\nThe AI model is temporarily busy or unavailable. ${sourceList}\n\nPlease try again in a few moments! ✨`;
         }
 
         return { answer, sources };
@@ -124,7 +154,22 @@ class RAGPipeline {
             try {
                 yield `data: ${JSON.stringify({ type: 'sources', sources: [] })}\n\n`;
 
-                const system_prompt = "You are a BRILLIANT and SUPER FRIENDLY Materials Science Expert! 🧠✨ Your goal is to provide helpful, detailed, and encouraging scientific answers. CRITICAL: You MUST use many relevant emojis (like 🔬, 🧪, 🚀, 👉, 🌟, 🧠) throughout your response. Structure your answers with BOLD headers and bullet points! 💎";
+                const system_prompt = `You are a professional AI assistant for material science researchers.
+
+Instructions:
+- Answer exactly according to the user’s question depth.
+- Give concise answers for simple questions.
+- Give detailed, structured, technical explanations only when required.
+- Do not add unrelated information, assumptions, warnings, history, or extra context unless asked.
+- Prioritize accuracy, clarity, and relevance.
+- Use scientific terminology correctly but explain complex concepts simply when needed.
+- If the question is ambiguous, ask a short clarifying question before answering.
+- Prefer direct answers over long introductions.
+- Use bullet points, tables, equations, or stepwise explanations only when they improve understanding.
+- For research questions, include mechanisms, properties, equations, comparisons, applications, and limitations only if relevant.
+- Never hallucinate data, citations, or experimental results.
+- If unsure, clearly state uncertainty instead of guessing.
+- Maintain a professional and research-oriented tone.`;
                 
                 const recentHistory = history.slice(-4); // Only keep the last 4 messages
                 const fetchMessages = [
@@ -227,6 +272,29 @@ class RAGPipeline {
                 const docs = allDocs.filter(d => d.score >= RELEVANCE_THRESHOLD);
                 console.log(`DEBUG: Found ${allDocs.length} documents, ${docs.length} above relevance threshold (${RELEVANCE_THRESHOLD}).`);
                 
+                if (docs.length === 0) {
+                    const outOfContextMsg = "I am sorry, but that question is out of the RAG context. Please ask a question related to the uploaded materials science datasets. 🧠🔬";
+                    yield `data: ${JSON.stringify({ type: 'sources', sources: [] })}\n\n`;
+                    yield `data: ${JSON.stringify({ type: 'chunk', content: outOfContextMsg })}\n\n`;
+                    
+                    try {
+                        await QueryLog.create({
+                            userId: user ? user.id : null,
+                            userEmail: user ? user.email : 'guest',
+                            query: queryText,
+                            answer: outOfContextMsg,
+                            sources: [],
+                            responseTimeMs: Date.now() - startTime,
+                            usedRagContext: false,
+                        });
+                    } catch (logErr) {
+                        console.warn('Failed to save query log:', logErr.message);
+                    }
+                    
+                    yield `data: ${JSON.stringify({ type: 'done' })}\n\n`;
+                    return;
+                }
+                
                 context = docs.map(d => {
                     const title = d.metadata ? (d.metadata.title || 'Unknown') : 'Unknown';
                     const year = d.metadata ? (d.metadata.year || 'Unknown') : 'Unknown';
@@ -253,16 +321,25 @@ class RAGPipeline {
         const messages = [
             {
                 role: "system",
-                content: `You are a BRILLIANT and SUPER FRIENDLY expert Material Scientist! 🧠✨ Your goal is to make complex scientific concepts feel exciting and easy to understand.
+                content: `You are a professional AI assistant for material science researchers.
 
-CRITICAL INSTRUCTIONS:
-1. MANDATORY EMOJIS: You MUST use at least 5-8 relevant emojis (like 🧠, 🔬, 🚀, 📦, 👉, ✨, 🧪, 📊) throughout your response to keep it interactive and friendly! 🌟
-2. BE INTERACTIVE: Use a warm, enthusiastic, and encouraging tone.
-3. PREMIUM FORMATTING: Use BOLD headers, bullet points, and tables to structure your answers beautifully.
-4. SCIENTIFIC CONTEXT: Here is the retrieved context to help you:
-${context}
+Instructions:
+- Answer exactly according to the user’s question depth.
+- Give concise answers for simple questions.
+- Give detailed, structured, technical explanations only when required.
+- Do not add unrelated information, assumptions, warnings, history, or extra context unless asked.
+- Prioritize accuracy, clarity, and relevance.
+- Use scientific terminology correctly but explain complex concepts simply when needed.
+- If the question is ambiguous, ask a short clarifying question before answering.
+- Prefer direct answers over long introductions.
+- Use bullet points, tables, equations, or stepwise explanations only when they improve understanding.
+- For research questions, include mechanisms, properties, equations, comparisons, applications, and limitations only if relevant.
+- Never hallucinate data, citations, or experimental results.
+- If unsure, clearly state uncertainty instead of guessing.
+- Maintain a professional and research-oriented tone.
 
-Always respond in a way that feels premium, helpful, and alive! 💎` + userGreeting
+Retrieved Scientific Context to help answer the question:
+${context}` + userGreeting
             }
         ];
 
@@ -313,9 +390,12 @@ Always respond in a way that feels premium, helpful, and alive! 💎` + userGree
             yield `data: ${JSON.stringify({ type: 'done' })}\n\n`;
             
         } catch (e) {
-            console.log(`LLM synthesis failed: ${e.message}. Falling back.`);
-            const rawText = `*(Notice: LLM Generator unavailable, showing raw RAG context below)*\n\n${context}`;
-            yield `data: ${JSON.stringify({ type: 'chunk', content: rawText })}\n\n`;
+            console.log(`LLM synthesis failed: ${e.message}.`);
+            const sourceList = sources.length > 0 
+                ? `\n\n**Relevant Reference Documents Found:**\n` + sources.map(s => `📄 *${s}*`).join('\n')
+                : '';
+            const fallbackText = `**AI Synthesis Service Offline** 🧠🔌\n\nThe AI model is temporarily busy or unavailable. ${sourceList}\n\nPlease try again in a few moments! ✨`;
+            yield `data: ${JSON.stringify({ type: 'chunk', content: fallbackText })}\n\n`;
             yield `data: ${JSON.stringify({ type: 'done' })}\n\n`;
         }
     }

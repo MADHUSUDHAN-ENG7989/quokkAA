@@ -21,9 +21,10 @@ export default function AuthModal({ onClose }) {
         setLoading(true);
         try {
             const endpoint = mode === 'login' ? '/api/auth/login' : '/api/auth/register';
+            const guestId = localStorage.getItem('quokka_guest_id');
             const body = mode === 'login'
-                ? { email: form.email, password: form.password }
-                : { name: form.name, email: form.email, password: form.password };
+                ? { email: form.email, password: form.password, guestId }
+                : { name: form.name, email: form.email, password: form.password, guestId };
 
             const res = await fetch(`${API}${endpoint}`, {
                 method: 'POST',
@@ -51,6 +52,7 @@ export default function AuthModal({ onClose }) {
                     headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
                 }).then(r => r.json());
 
+                const guestId = localStorage.getItem('quokka_guest_id');
                 // Send to our backend
                 const res = await fetch(`${API}/api/auth/google`, {
                     method: 'POST',
@@ -59,7 +61,8 @@ export default function AuthModal({ onClose }) {
                         googleId: userInfo.sub, 
                         email: userInfo.email, 
                         name: userInfo.name,
-                        picture: userInfo.picture
+                        picture: userInfo.picture,
+                        guestId
                     }),
                 });
                 const data = await res.json();

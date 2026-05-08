@@ -3,7 +3,7 @@
 :root {
   --font-family: 'Outfit', system-ui, -apple-system, sans-serif;
 
-  /* Deep Sea Professional Palette */
+  /* Deep Sea Professional Palette (Dark Mode) */
   --bg-dark: hsl(220, 25%, 7%);
   --bg-sidebar: hsl(220, 25%, 5%);
   --bg-card: hsl(220, 20%, 12%);
@@ -25,6 +25,101 @@
 
   --glass-bg: hsla(220, 25%, 10%, 0.7);
   --glass-blur: blur(12px);
+
+  /* Dynamic Gradient Colors */
+  --gradient-color-1: #0b0e14;
+  --gradient-color-2: #121826;
+  --gradient-color-3: #1a1b26;
+  --gradient-color-4: #0d1117;
+
+  --shadow-active-tab: -4px 0 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Light Mode Overrides (Premium Slate/Platinum Palette) */
+body.light-mode {
+  --bg-dark: hsl(220, 30%, 96%);
+  --bg-sidebar: hsl(220, 20%, 92%);
+  --bg-card: hsl(0, 0%, 100%);
+  --bg-input: hsl(220, 15%, 88%);
+
+  --text-primary: hsl(220, 40%, 15%);
+  --text-secondary: hsl(220, 20%, 40%);
+  --text-tertiary: hsl(220, 15%, 55%);
+
+  --accent-cyan: hsl(195, 100%, 40%);
+  --accent-blue: hsl(215, 100%, 50%);
+  --accent-glow: hsla(195, 100%, 40%, 0.15);
+
+  --border-dim: hsla(220, 20%, 0%, 0.06);
+  --border-bright: hsla(220, 20%, 0%, 0.12);
+
+  --glass-bg: hsla(220, 30%, 96%, 0.85);
+  --glass-blur: blur(12px);
+
+  /* Light Gradient Colors */
+  --gradient-color-1: #f1f5f9;
+  --gradient-color-2: #e2e8f0;
+  --gradient-color-3: #cbd5e1;
+  --gradient-color-4: #f8fafc;
+
+  --shadow-active-tab: -4px 0 6px rgba(0, 0, 0, 0.04);
+}
+
+/* Reading Mode - Intensity 1 (Subtle Warmth) */
+body.reading-mode-1 {
+  filter: sepia(0.18) saturate(0.98) contrast(0.98);
+}
+body.reading-mode-1::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(243, 156, 18, 0.03); /* Subtle Warm amber */
+  pointer-events: none;
+  z-index: 999999;
+  mix-blend-mode: multiply;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* Reading Mode - Intensity 2 (Standard Eye Care) */
+body.reading-mode-2 {
+  filter: sepia(0.35) saturate(0.95) contrast(0.95);
+}
+body.reading-mode-2::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(243, 156, 18, 0.06); /* Standard Warm amber */
+  pointer-events: none;
+  z-index: 999999;
+  mix-blend-mode: multiply;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+}
+
+/* Reading Mode - Intensity 3 (High Blue Light Reduction) */
+body.reading-mode-3 {
+  filter: sepia(0.55) saturate(0.92) contrast(0.92);
+}
+body.reading-mode-3::after {
+  content: "";
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(243, 156, 18, 0.1); /* Deep Amber warmth */
+  pointer-events: none;
+  z-index: 999999;
+  mix-blend-mode: multiply;
+  opacity: 1;
+  transition: opacity 0.3s ease;
 }
 
 * {
