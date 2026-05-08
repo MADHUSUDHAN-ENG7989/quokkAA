@@ -358,7 +358,7 @@ function App() {
           headers,
           body: JSON.stringify({
             guestId,
-            title: userQuery.length > 20 ? userQuery.substring(0, 20) + '...' : userQuery,
+            title: activeWindow.title !== "New Chat" ? activeWindow.title : (userQuery.length > 20 ? userQuery.substring(0, 20) + '...' : userQuery),
             messages: [initialUserMessage],
             model: selectedModel
           })
@@ -487,11 +487,15 @@ function App() {
           { role: 'assistant', content: fullAssistantContent, sources: finalSources }
         ];
 
+        const finalTitle = activeWindow.title !== "New Chat"
+          ? activeWindow.title
+          : (isNewChat ? (userQuery.length > 20 ? userQuery.substring(0, 20) + '...' : userQuery) : activeWindow.title);
+
         await fetch(`${API}/api/chats/${currentSessionId}`, {
           method: 'PUT',
           headers,
           body: JSON.stringify({
-            title: isNewChat ? (userQuery.length > 20 ? userQuery.substring(0, 20) + '...' : userQuery) : activeWindow.title,
+            title: finalTitle,
             messages: finalMessages,
             model: selectedModel
           })
@@ -500,7 +504,7 @@ function App() {
         console.error("Error syncing chat to MongoDB:", syncErr);
       }
 
-      if (isNewChat) {
+      if (isNewChat && activeWindow.title === "New Chat") {
         try {
           const titleResponse = await fetch(`${API}/api/generate_title`, {
             method: 'POST',
