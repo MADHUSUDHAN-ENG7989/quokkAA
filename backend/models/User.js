@@ -7,6 +7,8 @@ const userSchema = new mongoose.Schema({
     password: { type: String, default: null }, // null for Google-only users
     googleId: { type: String, default: null },
     role: { type: String, enum: ['public', 'admin'], default: 'public' },
+    apiKey: { type: String, default: null, unique: true, sparse: true },
+    isSubscribed: { type: Boolean, default: false }
 }, { timestamps: true });
 
 // Hash password before saving

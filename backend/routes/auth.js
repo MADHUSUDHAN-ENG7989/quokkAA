@@ -32,7 +32,7 @@ router.post('/register', async (req, res) => {
             await ChatSession.updateMany({ guestId, userId: null }, { $set: { userId: user._id, guestId: null } });
         }
 
-        res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+        res.status(201).json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, apiKey: user.apiKey, isSubscribed: user.isSubscribed } });
     } catch (e) {
         console.error('Register error:', e);
         res.status(500).json({ error: 'Registration failed' });
@@ -59,7 +59,7 @@ router.post('/login', async (req, res) => {
             await ChatSession.updateMany({ guestId, userId: null }, { $set: { userId: user._id, guestId: null } });
         }
 
-        res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role } });
+        res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, apiKey: user.apiKey, isSubscribed: user.isSubscribed } });
     } catch (e) {
         console.error('Login error:', e);
         res.status(500).json({ error: 'Login failed' });
@@ -90,12 +90,76 @@ router.post('/google', async (req, res) => {
             await ChatSession.updateMany({ guestId, userId: null }, { $set: { userId: user._id, guestId: null } });
         }
 
-        res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, picture } });
+        res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, apiKey: user.apiKey, isSubscribed: user.isSubscribed, picture } });
     } catch (e) {
         console.error('Google auth error:', e);
         res.status(401).json({ error: 'Google authentication failed' });
     }
 });
 
+
+const { verifyToken } = require('../middleware/auth');
+const crypto = require('crypto');
+
+// GET /api/auth/profile
+router.get('/profile', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        res.json({
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                apiKey: user.apiKey,
+                isSubscribed: user.isSubscribed
+            }
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to fetch profile' });
+    }
+});
+
+// POST /api/auth/subscribe (simulated payment - sets isSubscribed to true)
+router.post('/subscribe', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+        
+        user.isSubscribed = true;
+        // Also automatically generate their first API Key if they don't have one!
+        if (!user.apiKey) {
+            user.apiKey = 'qk_' + crypto.randomBytes(16).toString('hex');
+        }
+        await user.save();
+
+        res.json({
+            success: true,
+            isSubscribed: user.isSubscribed,
+            apiKey: user.apiKey
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to subscribe' });
+    }
+});
+
+// POST /api/auth/generate_key (regenerate API Key)
+router.post('/generate_key', verifyToken, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id);
+        if (!user) return res.status(404).json({ error: 'User not found' });
+
+        user.apiKey = 'qk_' + crypto.randomBytes(16).toString('hex');
+        await user.save();
+
+        res.json({
+            success: true,
+            apiKey: user.apiKey
+        });
+    } catch (e) {
+        res.status(500).json({ error: 'Failed to generate API Key' });
+    }
+});
 
 module.exports = router;

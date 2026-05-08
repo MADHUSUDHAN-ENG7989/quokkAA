@@ -1059,3 +1059,14 @@
     display: none;
   }
 }
+
+/* Spinner rotation animation for secure checkout simulation */
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.spinner {
+  display: inline-block;
+  box-sizing: border-box;
+}

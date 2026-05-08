@@ -106,6 +106,7 @@ function App() {
   const [showSearch, setShowSearch] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showApiModal, setShowApiModal] = useState(false);
+  const [showBillingModal, setShowBillingModal] = useState(false);
   const modelMenuRef = useRef(null);
 
   // Close dropdown when clicking outside
@@ -587,6 +588,7 @@ function App() {
         {showAuth && <AuthModal onClose={() => setShowAuth(false)} />}
         {showStatusModal && <StatusModal onClose={() => setShowStatusModal(false)} />}
         {showApiModal && <ApiModal onClose={() => setShowApiModal(false)} />}
+        {showBillingModal && <BillingModal onClose={() => setShowBillingModal(false)} />}
       </AnimatePresence>
       {/* Vertical Browser Sidebar */}
       <aside className="browser-sidebar">
@@ -699,7 +701,7 @@ function App() {
         {/* Account Profile Dashboard section */}
         <div className="sidebar-profile">
           {user ? (
-            <div className="profile-container" onClick={() => { if (user.role === 'admin') setShowAdmin(true); }}>
+            <div className="profile-container" onClick={() => { if (user.role === 'admin') setShowAdmin(true); else setShowBillingModal(true); }}>
               <div className="profile-avatar">
                 {user.name ? user.name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
               </div>
@@ -1079,3 +1081,189 @@ function ApiModal({ onClose }) {
     </div>
   );
 }
+
+// Premium Billing & API Key Dashboard Modal
+function BillingModal({ onClose }) {
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [copied, setCopied] = useState(false);
+  
+  const [localUser, setLocalUser] = useState(() => {
+    const saved = localStorage.getItem('user');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const handleSubscribe = async () => {
+    setIsProcessing(true);
+    // Simulate premium payment processing spinner
+    setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API}/api/auth/subscribe`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          }
+        });
+        const data = await res.json();
+        if (data.success) {
+          const updatedUser = { ...localUser, isSubscribed: true, apiKey: data.apiKey };
+          localStorage.setItem('user', JSON.stringify(updatedUser));
+          setLocalUser(updatedUser);
+          window.location.reload(); 
+        }
+      } catch (err) {
+        console.error("Subscription error:", err);
+      } finally {
+        setIsProcessing(false);
+      }
+    }, 2500);
+  };
+
+  const handleRegenerateKey = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API}/api/auth/generate_key`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await res.json();
+      if (data.success) {
+        const updatedUser = { ...localUser, apiKey: data.apiKey };
+        localStorage.setItem('user', JSON.stringify(updatedUser));
+        setLocalUser(updatedUser);
+      }
+    } catch (err) {
+      console.error("Regeneration error:", err);
+    }
+  };
+
+  const handleCopy = () => {
+    if (localUser?.apiKey) {
+      navigator.clipboard.writeText(localUser.apiKey);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  if (!localUser) {
+    return (
+      <div className="auth-overlay" onClick={onClose}>
+        <div className="auth-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="auth-header">
+            <h2>API Key & Subscription</h2>
+            <button className="auth-close" onClick={onClose}>×</button>
+          </div>
+          <p style={{ color: 'var(--text-secondary)', textAlign: 'center', margin: '24px 0' }}>
+            Please sign in or create an account to view and manage API access.
+          </p>
+          <button className="auth-submit-btn" onClick={onClose}>Close Panel</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="auth-overlay" onClick={onClose}>
+      <div className="auth-modal" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+        <div className="auth-header">
+          <h2>API & Billing Workspace</h2>
+          <button className="auth-close" onClick={onClose}>×</button>
+        </div>
+
+        {isProcessing ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0', gap: '16px' }}>
+            <div className="spinner" style={{ width: '40px', height: '40px', border: '3px solid rgba(0,204,102,0.1)', borderTopColor: '#00cc66', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+            <p style={{ color: 'var(--text-primary)', fontWeight: '600', fontSize: '14px', margin: 0, textAlign: 'center' }}>
+              Processing Secure Payment...
+            </p>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '12px', margin: 0, textAlign: 'center' }}>
+              Simulating payment gateway transaction. Please do not close this window.
+            </p>
+          </div>
+        ) : !localUser.isSubscribed ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ background: 'rgba(0,204,102,0.05)', border: '1px solid rgba(0,204,102,0.2)', padding: '16px', borderRadius: '8px', textAlign: 'center' }}>
+              <span style={{ fontSize: '11px', color: '#00cc66', background: 'rgba(0,204,102,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                FREE ACCOUNT
+              </span>
+              <h3 style={{ margin: '12px 0 6px 0', color: 'var(--text-primary)', fontSize: '20px' }}>$29.00 <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>/ month</span></h3>
+              <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+                Get full access to Quokka's concurrent materials science pipelines and custom API Key generation.
+              </p>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ display: 'flex', gap: '8px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--accent-cyan)' }}>✓</span>
+                <span>Generate active and regeneratable <code>qk_</code> API keys.</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--accent-cyan)' }}>✓</span>
+                <span>Fetch from textbooks, web search, and Qwen model concurrently.</span>
+              </div>
+              <div style={{ display: 'flex', gap: '8px', fontSize: '12.5px', color: 'var(--text-secondary)' }}>
+                <span style={{ color: 'var(--accent-cyan)' }}>✓</span>
+                <span>99.9% uptime with ultra-fast sub-100ms response times.</span>
+              </div>
+            </div>
+            <button className="auth-submit-btn" onClick={handleSubscribe} style={{ background: '#00cc66', color: '#fff', border: 'none', marginTop: '10px' }}>
+              Subscribe & Generate API Key
+            </button>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <div style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', padding: '16px', borderRadius: '8px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontSize: '11px', color: 'var(--accent-cyan)', background: 'rgba(0,180,216,0.1)', padding: '2px 8px', borderRadius: '10px', fontWeight: 'bold' }}>
+                  PREMIUM SUBSCRIBER
+                </span>
+                <span style={{ fontSize: '12px', color: '#00cc66', fontWeight: 'bold' }}>Active</span>
+              </div>
+              <p style={{ margin: 0, fontSize: '12px', color: 'var(--text-secondary)' }}>
+                You have active API access. Use your key in the <code>x-api-key</code> request header.
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 'bold', color: 'var(--text-tertiary)' }}>Your API Key</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input 
+                  type={showApiKey ? "text" : "password"} 
+                  value={localUser.apiKey || ''} 
+                  readOnly 
+                  style={{ flexGrow: 1, padding: '8px 12px', background: 'var(--bg-card)', border: '1px solid var(--border-dim)', borderRadius: '6px', color: 'var(--text-primary)', fontFamily: 'monospace', fontSize: '12.5px', outline: 'none' }}
+                />
+                <button 
+                  onClick={() => setShowApiKey(!showApiKey)}
+                  style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: '6px', color: 'var(--text-secondary)', padding: '0 10px', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  {showApiKey ? "Hide" : "Show"}
+                </button>
+                <button 
+                  onClick={handleCopy}
+                  style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-dim)', borderRadius: '6px', color: 'var(--text-secondary)', padding: '0 10px', cursor: 'pointer', fontSize: '12px' }}
+                >
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px', marginTop: '10px' }}>
+              <button className="auth-submit-btn" onClick={handleRegenerateKey} style={{ flexGrow: 1, background: 'transparent', border: '1px solid var(--border-dim)', color: 'var(--text-primary)' }}>
+                Regenerate Key
+              </button>
+              <button className="auth-submit-btn" onClick={onClose} style={{ flexGrow: 1 }}>
+                Close Workspace
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
