@@ -1089,7 +1089,7 @@ function BillingModal({ onClose }) {
   const [copied, setCopied] = useState(false);
   
   const [localUser, setLocalUser] = useState(() => {
-    const saved = localStorage.getItem('user');
+    const saved = localStorage.getItem('quokka_user');
     return saved ? JSON.parse(saved) : null;
   });
 
@@ -1098,7 +1098,7 @@ function BillingModal({ onClose }) {
     // Simulate premium payment processing spinner
     setTimeout(async () => {
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('quokka_token');
         const res = await fetch(`${API}/api/auth/subscribe`, {
           method: 'POST',
           headers: {
@@ -1109,7 +1109,7 @@ function BillingModal({ onClose }) {
         const data = await res.json();
         if (data.success) {
           const updatedUser = { ...localUser, isSubscribed: true, apiKey: data.apiKey };
-          localStorage.setItem('user', JSON.stringify(updatedUser));
+          localStorage.setItem('quokka_user', JSON.stringify(updatedUser));
           setLocalUser(updatedUser);
           window.location.reload(); 
         }
@@ -1123,7 +1123,7 @@ function BillingModal({ onClose }) {
 
   const handleRegenerateKey = async () => {
     try {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('quokka_token');
       const res = await fetch(`${API}/api/auth/generate_key`, {
         method: 'POST',
         headers: {
@@ -1134,7 +1134,7 @@ function BillingModal({ onClose }) {
       const data = await res.json();
       if (data.success) {
         const updatedUser = { ...localUser, apiKey: data.apiKey };
-        localStorage.setItem('user', JSON.stringify(updatedUser));
+        localStorage.setItem('quokka_user', JSON.stringify(updatedUser));
         setLocalUser(updatedUser);
       }
     } catch (err) {
