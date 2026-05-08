@@ -8,7 +8,7 @@ payload = {
 }
 
 headers = {
-    "x-api-key": "qk_your_api_key_here"  # Get this from your profile billing workspace
+    "x-api-key": "qk_6fd3406ff9227aa6fd2477596be3b463"
 }
 
 res = requests.post(url, json=payload, headers=headers, stream=True)

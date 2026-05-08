@@ -1168,7 +1168,7 @@ function BillingModal({ onClose }) {
 
       // 2. Open the Razorpay Checkout Modal
       const options = {
-        key: "rzp_test_SlYQsdChlM0l0M", // Exact same key ID as e-commerce app
+        key: "rzp_test_Smvg1Tn94fsyYr", // New active Razorpay test key
         amount: order.amount,
         currency: order.currency,
         name: "Quokka Materials",
