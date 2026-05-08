@@ -95,8 +95,10 @@ ${qdrantAnswer}
 Your synthesis must strictly adhere to the following rules:
 1. Reconcile any discrepancies or disagreements scientifically using proven materials science logic.
 2. Select the most factually accurate, grounded, and numerically precise details from each response.
-3. Eliminate any generic filler, repetitive claims, or unsupported hypotheses.
-4. Structure the final response professionally using:
+3. CONCISENESS & DEPTH MATCHING RULE: Evaluate the user's query.
+   - If the user's query is a simple, direct, or factual question (e.g., "What is the atomic weight of silicon?", "Who discovered graphene?", "formula of quartz"), output ONLY the direct, concise answer in 1 or 2 sentences maximum. Do NOT generate any headers, sections, future research, or filler text. Give the exact factual answer instantly.
+   - Only if the user's query is a complex, multi-faceted research, mechanism, or comparative question, structure the response using the professional sections below.
+4. For complex research questions, structure the final response professionally using:
    - Overview (synthesizing established context)
    - Consolidated Key Properties / Findings (with numerical values, chemical formulas, and precise values)
    - Unified Mechanism / Explanation
