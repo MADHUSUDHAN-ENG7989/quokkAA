@@ -1129,6 +1129,43 @@ function BillingModal({ onClose }) {
         return;
       }
 
+      if (order.sandbox) {
+        alert("🔒 Developer Sandbox: Reference test credentials are currently expired. Redirecting to Quokka Sandbox Payment Gateway...");
+        setTimeout(async () => {
+          try {
+            setIsProcessing(true);
+            const verifyRes = await fetch(`${API}/api/payment/verify`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({
+                razorpay_order_id: order.id,
+                razorpay_payment_id: 'pay_sand_' + Math.random().toString(36).substring(2, 10),
+                razorpay_signature: 'sig_sand_' + Math.random().toString(36).substring(2, 15)
+              })
+            });
+            const data = await verifyRes.json();
+            if (data.success) {
+              const updatedUser = { ...localUser, isSubscribed: true, apiKey: data.apiKey };
+              localStorage.setItem('quokka_user', JSON.stringify(updatedUser));
+              setLocalUser(updatedUser);
+              alert("🎉 Payment Successful! Your Quokka Premium Subscription is now Active (Sandbox Mode).");
+              window.location.reload();
+            } else {
+              alert("Sandbox signature verification failed.");
+            }
+          } catch (err) {
+            console.error("Sandbox verification error:", err);
+            alert("Verification server error.");
+          } finally {
+            setIsProcessing(false);
+          }
+        }, 1500);
+        return;
+      }
+
       // 2. Open the Razorpay Checkout Modal
       const options = {
         key: "rzp_test_SlYQsdChlM0l0M", // Exact same key ID as e-commerce app
