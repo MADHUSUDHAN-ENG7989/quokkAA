@@ -6,8 +6,8 @@ const { verifyToken } = require('../middleware/auth');
 const User = require('../models/User');
 
 const razorpay = new Razorpay({
-    key_id: process.env.RAZORPAY_KEY_ID,
-    key_secret: process.env.RAZORPAY_KEY_SECRET,
+    key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_SlYQsdChlM0l0M',
+    key_secret: process.env.RAZORPAY_KEY_SECRET || '2dDfZEqX7qWUp9SvDRnL6cOr',
 });
 
 // @route   POST /api/payment/orders
@@ -39,7 +39,7 @@ router.post('/verify', verifyToken, async (req, res) => {
 
         const body = razorpay_order_id + "|" + razorpay_payment_id;
         const expectedSignature = crypto
-            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
+            .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '2dDfZEqX7qWUp9SvDRnL6cOr')
             .update(body.toString())
             .digest('hex');
 
