@@ -110,6 +110,7 @@ function App() {
   const modelMenuRef = useRef(null);
   const [showUploadMenu, setShowUploadMenu] = useState(false);
   const uploadMenuRef = useRef(null);
+  const [attachedFile, setAttachedFile] = useState(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -170,91 +171,11 @@ function App() {
     triggerUpload('.pdf,.txt,.md');
   };
 
-  const handleFileChange = async (e) => {
+  const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
+    setAttachedFile(file);
     e.target.value = '';
-
-    const tempChatId = 'temp_sum_' + Date.now().toString();
-    const initialUserMsg = { 
-      role: 'user', 
-      content: `Please summarize the attached document: **${file.name}**` 
-    };
-    const assistantLoadingMsg = { 
-      role: 'assistant', 
-      content: `Parsing and summarizing **${file.name}** using Groq Llama-3.1... Please wait, this may take a few moments for larger papers.` 
-    };
-
-    const tempWindow = {
-      id: tempChatId,
-      title: `Summarizing: ${file.name.substring(0, 15)}...`,
-      messages: [initialUserMsg, assistantLoadingMsg],
-      isLoading: true,
-      model: 'rag'
-    };
-
-    setWindows(prev => [tempWindow, ...prev]);
-    setActiveWindowId(tempChatId);
-
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('guestId', guestId);
-
-    try {
-      const headers = {};
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      } else {
-        headers['x-guest-id'] = guestId;
-      }
-
-      const res = await fetch(`${API}/api/summarize`, {
-        method: 'POST',
-        headers,
-        body: formData
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || data.error) {
-        throw new Error(data.error || 'Failed to parse and summarize file.');
-      }
-
-      setWindows(prev => prev.map(w => {
-        if (w.id === tempChatId) {
-          return {
-            id: data._id,
-            title: data.title,
-            messages: data.messages,
-            isLoading: false,
-            model: 'rag'
-          };
-        }
-        return w;
-      }));
-      setActiveWindowId(data._id);
-
-    } catch (err) {
-      console.error("Error summarizing file:", err);
-      setWindows(prev => prev.map(w => {
-        if (w.id === tempChatId) {
-          return {
-            ...w,
-            isLoading: false,
-            messages: [
-              initialUserMsg,
-              { 
-                role: 'assistant', 
-                content: `❌ **Error during summarization:**\n\n${err.message || 'The server encountered an error while processing the document. Please verify the file is not corrupted and try again.'}`, 
-                isError: true 
-              }
-            ]
-          };
-        }
-        return w;
-      }));
-    }
   };
 
   const createNewWindow = () => {
@@ -409,7 +330,8 @@ function App() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!activeWindow || !input.trim() || activeWindow.isLoading) return;
+    if (!activeWindow || activeWindow.isLoading) return;
+    if (!input.trim() && !attachedFile) return;
 
     if (isLimitReached) {
       setShowAuth(true);
@@ -418,6 +340,102 @@ function App() {
 
     const userQuery = input.trim();
     setInput('');
+
+    if (attachedFile) {
+      const fileToUpload = attachedFile;
+      setAttachedFile(null);
+
+      const tempChatId = 'temp_sum_' + Date.now().toString();
+      const initialUserMsg = { 
+        role: 'user', 
+        content: userQuery 
+          ? `Attached Document: **${fileToUpload.name}**\n\nQuestion: ${userQuery}`
+          : `Attached Document: **${fileToUpload.name}**\n\nPlease summarize this document.`
+      };
+      const assistantLoadingMsg = { 
+        role: 'assistant', 
+        content: `Analyzing **${fileToUpload.name}** and generating response... Please wait.` 
+      };
+
+      const tempWindow = {
+        id: tempChatId,
+        title: userQuery ? `Analysis: ${fileToUpload.name.substring(0, 15)}...` : `Summary: ${fileToUpload.name.substring(0, 15)}...`,
+        messages: [initialUserMsg, assistantLoadingMsg],
+        isLoading: true,
+        model: 'rag'
+      };
+
+      setWindows(prev => {
+        const isActiveEmpty = prev.find(w => w.id === activeWindowId)?.messages.length === 0;
+        if (isActiveEmpty) {
+          return prev.map(w => w.id === activeWindowId ? tempWindow : w);
+        } else {
+          return [tempWindow, ...prev];
+        }
+      });
+      setActiveWindowId(tempChatId);
+
+      const formData = new FormData();
+      formData.append('file', fileToUpload);
+      formData.append('prompt', userQuery);
+      formData.append('guestId', guestId);
+
+      try {
+        const headers = {};
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        } else {
+          headers['x-guest-id'] = guestId;
+        }
+
+        const res = await fetch(`${API}/api/summarize`, {
+          method: 'POST',
+          headers,
+          body: formData
+        });
+
+        const data = await res.json();
+
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'Failed to analyze file.');
+        }
+
+        setWindows(prev => prev.map(w => {
+          if (w.id === tempChatId) {
+            return {
+              id: data._id,
+              title: data.title,
+              messages: data.messages,
+              isLoading: false,
+              model: 'rag'
+            };
+          }
+          return w;
+        }));
+        setActiveWindowId(data._id);
+
+      } catch (err) {
+        console.error("Error analyzing file:", err);
+        setWindows(prev => prev.map(w => {
+          if (w.id === tempChatId) {
+            return {
+              ...w,
+              isLoading: false,
+              messages: [
+                initialUserMsg,
+                { 
+                  role: 'assistant', 
+                  content: `❌ **Error during document analysis:**\n\n${err.message || 'The server encountered an error while processing the document.'}`, 
+                  isError: true 
+                }
+              ]
+            };
+          }
+          return w;
+        }));
+      }
+      return;
+    }
 
     let currentSessionId = activeWindowId;
     let isNewChat = activeWindowId.startsWith('temp_');
@@ -1084,6 +1102,13 @@ function App() {
         </div>
 
         <div className="input-area">
+          {attachedFile && (
+            <div className="attached-file-badge">
+              <span className="file-badge-icon">📎</span>
+              <span className="file-badge-name">{attachedFile.name}</span>
+              <button type="button" className="file-badge-remove" onClick={() => setAttachedFile(null)} title="Remove file">×</button>
+            </div>
+          )}
           <form className="input-form" onSubmit={handleSubmit}>
             <div className="attach-container" ref={uploadMenuRef} style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
               <button type="button" className="attach-btn" title="Attach file" onClick={() => setShowUploadMenu(!showUploadMenu)}>

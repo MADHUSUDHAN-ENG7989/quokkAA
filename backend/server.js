@@ -119,8 +119,11 @@ app.post('/api/summarize', softAuth, upload.single('file'), async (req, res) => 
             isTruncated = true;
         }
 
-        const systemPrompt = `You are an elite research paper synthesizer and scientific writer. 
-Generate a comprehensive, structured, and professional summary of the provided document.
+        const customPrompt = req.body.prompt || '';
+
+        const systemPrompt = customPrompt 
+            ? `You are an elite research paper synthesizer and scientific writer. Use the provided document content to answer the user's specific question or instruction comprehensively. Always maintain a highly professional, academic, and technical tone. Use markdown formatting to make the answer incredibly legible.`
+            : `You are an elite research paper synthesizer and scientific writer. Generate a comprehensive, structured, and professional summary of the provided document.
 Your summary must include:
 - **Core Objective & Background** (1-2 sentences)
 - **Key Methodologies / Concepts** (structured bullet points)
@@ -129,7 +132,7 @@ Your summary must include:
 
 Maintain a highly professional, academic, and technical tone. Use markdown formatting to make the summary incredibly legible and engaging.`;
 
-        const userPrompt = `Document Name: ${fileName}${isTruncated ? ' (Truncated due to length)' : ''}\n\nContent:\n${textContent}`;
+        const userPrompt = `Document Name: ${fileName}${isTruncated ? ' (Truncated due to length)' : ''}\n\nContent:\n${textContent}\n\nUser Question/Instruction:\n${customPrompt || 'Generate a comprehensive, structured summary of this document.'}`;
 
         if (!rag.groq) {
             return res.status(500).json({ error: 'Groq LLM Service is not configured on the server.' });
@@ -149,7 +152,9 @@ Maintain a highly professional, academic, and technical tone. Use markdown forma
 
         const initialUserMessage = { 
             role: 'user', 
-            content: `Please summarize the attached document: **${fileName}**` 
+            content: customPrompt 
+                ? `Attached Document: **${fileName}**\n\nQuestion: ${customPrompt}`
+                : `Please summarize the attached document: **${fileName}**` 
         };
         const assistantMessage = { 
             role: 'assistant', 
@@ -160,7 +165,7 @@ Maintain a highly professional, academic, and technical tone. Use markdown forma
         const newSession = await ChatSession.create({
             userId: req.user ? req.user.id : null,
             guestId: req.user ? null : (req.headers['x-guest-id'] || req.body.guestId || 'g_anonymous'),
-            title: `Summary: ${fileName.substring(0, 30)}`,
+            title: customPrompt ? `Analysis: ${fileName.substring(0, 20)}...` : `Summary: ${fileName.substring(0, 20)}...`,
             messages: [initialUserMessage, assistantMessage],
             model: 'rag'
         });
