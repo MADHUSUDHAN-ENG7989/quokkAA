@@ -125,6 +125,7 @@ function App() {
 
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   const activeWindow = windows.find(w => w.id === activeWindowId) || windows[0] || { messages: [], isLoading: false };
 
@@ -146,6 +147,101 @@ function App() {
     const { scrollTop, scrollHeight, clientHeight } = scrollContainerRef.current;
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 50;
     setShouldAutoScroll(isAtBottom);
+  };
+
+  const handleTriggerSummarize = () => {
+    if (isLimitReached) {
+      setShowAuth(true);
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    e.target.value = '';
+
+    const tempChatId = 'temp_sum_' + Date.now().toString();
+    const initialUserMsg = { 
+      role: 'user', 
+      content: `Please summarize the attached document: **${file.name}**` 
+    };
+    const assistantLoadingMsg = { 
+      role: 'assistant', 
+      content: `Parsing and summarizing **${file.name}** using Groq Llama-3.1... Please wait, this may take a few moments for larger papers.` 
+    };
+
+    const tempWindow = {
+      id: tempChatId,
+      title: `Summarizing: ${file.name.substring(0, 15)}...`,
+      messages: [initialUserMsg, assistantLoadingMsg],
+      isLoading: true,
+      model: 'rag'
+    };
+
+    setWindows(prev => [tempWindow, ...prev]);
+    setActiveWindowId(tempChatId);
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('guestId', guestId);
+
+    try {
+      const headers = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      } else {
+        headers['x-guest-id'] = guestId;
+      }
+
+      const res = await fetch(`${API}/api/summarize`, {
+        method: 'POST',
+        headers,
+        body: formData
+      });
+
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        throw new Error(data.error || 'Failed to parse and summarize file.');
+      }
+
+      setWindows(prev => prev.map(w => {
+        if (w.id === tempChatId) {
+          return {
+            id: data._id,
+            title: data.title,
+            messages: data.messages,
+            isLoading: false,
+            model: 'rag'
+          };
+        }
+        return w;
+      }));
+      setActiveWindowId(data._id);
+
+    } catch (err) {
+      console.error("Error summarizing file:", err);
+      setWindows(prev => prev.map(w => {
+        if (w.id === tempChatId) {
+          return {
+            ...w,
+            isLoading: false,
+            messages: [
+              initialUserMsg,
+              { 
+                role: 'assistant', 
+                content: `❌ **Error during summarization:**\n\n${err.message || 'The server encountered an error while processing the document. Please verify the file is not corrupted and try again.'}`, 
+                isError: true 
+              }
+            ]
+          };
+        }
+        return w;
+      }));
+    }
   };
 
   const createNewWindow = () => {
@@ -860,7 +956,15 @@ function App() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
+              style={{ flexDirection: 'column', gap: '32px', height: '100%', justifyContent: 'center' }}
             >
+              <input 
+                type="file" 
+                ref={fileInputRef} 
+                style={{ display: 'none' }} 
+                accept=".pdf,.txt,.md" 
+                onChange={handleFileChange} 
+              />
               <div className="empty-logo">
                 <motion.svg 
                   width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
@@ -879,6 +983,34 @@ function App() {
                 >
                   How can I help you today?
                 </motion.h1>
+              </div>
+
+              <div className="suggestion-container">
+                <div className="suggestion-cards">
+                  <div className="suggestion-card" onClick={handleTriggerSummarize}>
+                    <div className="suggestion-card-header">
+                      <span className="suggestion-icon">📄</span>
+                      <h3 className="suggestion-title">Summarize Article</h3>
+                    </div>
+                    <p className="suggestion-desc">Upload a PDF, TXT, or MD paper to get a comprehensive, structured scientific summary instantly.</p>
+                  </div>
+                  
+                  <div className="suggestion-card" onClick={() => setInput("Help me draft a materials science research abstract about ")}>
+                    <div className="suggestion-card-header">
+                      <span className="suggestion-icon">✍️</span>
+                      <h3 className="suggestion-title">Write or Edit</h3>
+                    </div>
+                    <p className="suggestion-desc">Draft abstracts, research notes, or technical reports with specialized scientific terminology.</p>
+                  </div>
+                  
+                  <div className="suggestion-card" onClick={() => setInput("Look up the crystalline properties and phase changes of ")}>
+                    <div className="suggestion-card-header">
+                      <span className="suggestion-icon">🔍</span>
+                      <h3 className="suggestion-title">Look Something Up</h3>
+                    </div>
+                    <p className="suggestion-desc">Search indexed materials science databases, physical properties, or crystalline structures.</p>
+                  </div>
+                </div>
               </div>
             </motion.div>
           ) : (

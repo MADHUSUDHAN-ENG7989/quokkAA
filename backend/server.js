@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const mongoose = require('mongoose');
 const { rag } = require('./rag');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
 const { liveRag } = require('./live-rag');
 const { hybridRag } = require('./hybrid-rag');
 const authRoutes = require('./routes/auth');
@@ -77,6 +79,96 @@ app.post('/api/generate_title', softAuth, async (req, res) => {
         res.json({ title });
     } catch (e) {
         res.json({ title: "New Chat" });
+    }
+});
+
+const upload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
+});
+
+app.post('/api/summarize', softAuth, upload.single('file'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({ error: 'No file uploaded.' });
+        }
+
+        const fileName = req.file.originalname;
+        const mimeType = req.file.mimetype;
+        let textContent = '';
+
+        if (mimeType === 'application/pdf') {
+            const data = await pdfParse(req.file.buffer);
+            textContent = data.text;
+        } else if (mimeType === 'text/plain' || mimeType === 'text/markdown' || fileName.endsWith('.md') || fileName.endsWith('.txt')) {
+            textContent = req.file.buffer.toString('utf-8');
+        } else {
+            return res.status(400).json({ error: 'Unsupported file type. Please upload a PDF, TXT, or MD file.' });
+        }
+
+        if (!textContent || !textContent.trim()) {
+            return res.status(400).json({ error: 'The uploaded file is empty or contains no extractable text.' });
+        }
+
+        // Limit length to respect model context
+        const charLimit = 16000;
+        let isTruncated = false;
+        if (textContent.length > charLimit) {
+            textContent = textContent.substring(0, charLimit);
+            isTruncated = true;
+        }
+
+        const systemPrompt = `You are an elite research paper synthesizer and scientific writer. 
+Generate a comprehensive, structured, and professional summary of the provided document.
+Your summary must include:
+- **Core Objective & Background** (1-2 sentences)
+- **Key Methodologies / Concepts** (structured bullet points)
+- **Main Findings & Experimental Results** (detailed bullet points or tables if applicable)
+- **Significance & Research Implications** (conclusions)
+
+Maintain a highly professional, academic, and technical tone. Use markdown formatting to make the summary incredibly legible and engaging.`;
+
+        const userPrompt = `Document Name: ${fileName}${isTruncated ? ' (Truncated due to length)' : ''}\n\nContent:\n${textContent}`;
+
+        if (!rag.groq) {
+            return res.status(500).json({ error: 'Groq LLM Service is not configured on the server.' });
+        }
+
+        const completion = await rag.groq.chat.completions.create({
+            model: "llama-3.1-8b-instant",
+            messages: [
+                { role: 'system', content: systemPrompt },
+                { role: 'user', content: userPrompt }
+            ],
+            temperature: 0.5,
+            max_tokens: 1500
+        });
+
+        const summary = completion.choices[0].message.content || 'Failed to generate summary.';
+
+        const initialUserMessage = { 
+            role: 'user', 
+            content: `Please summarize the attached document: **${fileName}**` 
+        };
+        const assistantMessage = { 
+            role: 'assistant', 
+            content: summary,
+            sources: []
+        };
+
+        const newSession = await ChatSession.create({
+            userId: req.user ? req.user.id : null,
+            guestId: req.user ? null : (req.headers['x-guest-id'] || req.body.guestId || 'g_anonymous'),
+            title: `Summary: ${fileName.substring(0, 30)}`,
+            messages: [initialUserMessage, assistantMessage],
+            model: 'rag'
+        });
+
+        res.status(201).json(newSession);
+
+    } catch (e) {
+        console.error('Error during summarization:', e);
+        res.status(500).json({ error: e.message });
     }
 });
 
