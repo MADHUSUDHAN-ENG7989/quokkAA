@@ -114,6 +114,7 @@ function App() {
   const [isListening, setIsListening] = useState(false);
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
   const recognitionRef = useRef(null);
+  const speechStartInputRef = useRef('');
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -152,12 +153,8 @@ function App() {
 
         const transcript = finalTranscript || interimTranscript;
         if (transcript.trim()) {
-          setInput(prev => {
-            if (prev.trim()) {
-              return prev.trim() + ' ' + transcript;
-            }
-            return transcript;
-          });
+          const baseText = speechStartInputRef.current;
+          setInput(baseText ? baseText.trim() + ' ' + transcript : transcript);
         }
       };
 
@@ -185,6 +182,7 @@ function App() {
       setIsListening(false);
     } else {
       try {
+        speechStartInputRef.current = input;
         recognitionRef.current.start();
         setIsListening(true);
       } catch (err) {
