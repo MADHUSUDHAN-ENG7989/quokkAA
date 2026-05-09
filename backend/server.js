@@ -98,7 +98,8 @@ app.post('/api/summarize', softAuth, upload.single('file'), async (req, res) => 
         let textContent = '';
 
         if (mimeType === 'application/pdf') {
-            const data = await pdfParse(req.file.buffer);
+            const parser = new pdfParse.PDFParse(new Uint8Array(req.file.buffer));
+            const data = await parser.getText();
             textContent = data.text;
         } else if (mimeType === 'text/plain' || mimeType === 'text/markdown' || fileName.endsWith('.md') || fileName.endsWith('.txt')) {
             textContent = req.file.buffer.toString('utf-8');
