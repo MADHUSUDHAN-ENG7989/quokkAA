@@ -115,6 +115,13 @@ function App() {
   const [speakingMessageId, setSpeakingMessageId] = useState(null);
   const recognitionRef = useRef(null);
   const speechStartInputRef = useRef('');
+  const silenceTimerRef = useRef(null);
+  const handleSubmitRef = useRef(null);
+
+  // Sync handleSubmit reference to prevent stale closures in timers
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  });
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -154,7 +161,20 @@ function App() {
         const transcript = finalTranscript || interimTranscript;
         if (transcript.trim()) {
           const baseText = speechStartInputRef.current;
-          setInput(baseText ? baseText.trim() + ' ' + transcript : transcript);
+          const updatedInput = baseText ? baseText.trim() + ' ' + transcript : transcript;
+          setInput(updatedInput);
+
+          // Reset and start silence auto-submit timer (3 seconds idle) ⏳
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = setTimeout(() => {
+            if (recognitionRef.current) {
+              recognitionRef.current.stop();
+              setIsListening(false);
+            }
+            if (handleSubmitRef.current) {
+              handleSubmitRef.current({ preventDefault: () => {} });
+            }
+          }, 3000);
         }
       };
 
@@ -178,6 +198,7 @@ function App() {
     }
 
     if (isListening) {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
       recognitionRef.current.stop();
       setIsListening(false);
     } else {
@@ -190,6 +211,13 @@ function App() {
       }
     }
   };
+
+  // Cleanup silence timer on unmount
+  useEffect(() => {
+    return () => {
+      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+    };
+  }, []);
 
   const readAloud = (msgId, text) => {
     if (!window.speechSynthesis) {
