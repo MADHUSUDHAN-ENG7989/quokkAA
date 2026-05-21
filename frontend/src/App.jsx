@@ -990,8 +990,15 @@ function App() {
       <main className="main-content">
         <header className="main-header">
           <div className="header-brand">
-
-            <span className="brand-name">Quokka</span>
+            <div className="brand-mark" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+              </svg>
+            </div>
+            <div className="brand-text-group">
+              <span className="brand-name">Quokka</span>
+              <span className="brand-tagline">Materials Science AI</span>
+            </div>
             <div className="model-selector" ref={modelMenuRef}>
               <button className="model-btn" onClick={() => setShowModelMenu(!showModelMenu)}>
                 <span className="model-name">
@@ -1100,7 +1107,7 @@ function App() {
               <>
                 {user.role === 'admin' && (
                   <button className="share-btn admin-dashboard-btn" onClick={() => setShowAdmin(true)} title="Admin Dashboard">
-                    🛡️ Admin
+                    Admin
                   </button>
                 )}
                 <div className="user-info">
@@ -1124,23 +1131,27 @@ function App() {
               style={{ flexDirection: 'column', gap: '32px', height: '100%', justifyContent: 'center' }}
             >
               <div className="empty-logo">
-                <motion.svg 
-                  width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"
-                  animate={{ y: [0, -10, 0] }}
-                  transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-                  whileHover={{ scale: 1.2, rotate: 10 }}
-                  whileTap={{ scale: 0.9 }}
-                >
-                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-                </motion.svg>
+                <div className="brand-mark" style={{ width: 56, height: 56, borderRadius: 14 }} aria-hidden="true">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
+                  </svg>
+                </div>
                 <motion.h1 
                   className="hero-text"
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  whileHover={{ scale: 1.05, color: '#00f2fe' }}
+                  transition={{ duration: 0.4 }}
                 >
-                  How can I help you today?
+                  How can I help with your research?
                 </motion.h1>
+                <motion.p
+                  className="hero-subtext"
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.08 }}
+                >
+                  Ask questions, summarize papers, or explore materials data with specialized RAG models.
+                </motion.p>
               </div>
 
               <div className="suggestion-container">
