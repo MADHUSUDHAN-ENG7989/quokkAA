@@ -48,7 +48,7 @@ function App() {
   
   const [windows, setWindows] = useState([]);
   const [activeWindowId, setActiveWindowId] = useState('');
-  const [guestId, setGuestId] = useState(() => {
+  const [guestId] = useState(() => {
     let id = localStorage.getItem('quokka_guest_id');
     if (!id) {
       id = 'g_' + Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
@@ -272,6 +272,7 @@ function App() {
     if (activeWindow && activeWindow.messages) {
       scrollToBottom();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeWindow?.messages, activeWindow?.isLoading]);
 
   // Handle manual scroll to disable auto-scroll if user moves up
@@ -418,6 +419,7 @@ function App() {
     }
   };
 
+  // eslint-disable-next-line no-unused-vars
   const exportCurrentChat = () => {
     if (!activeWindow || !activeWindow.messages || activeWindow.messages.length === 0) return;
 
@@ -449,6 +451,7 @@ function App() {
     });
   };
 
+  // eslint-disable-next-line no-unused-vars
   const updateActiveWindow = (updates) => {
     setWindows(prev => prev.map(w =>
       w.id === activeWindowId ? { ...w, ...updates } : w
@@ -1431,7 +1434,7 @@ function ApiModal({ onClose }) {
           <button className="auth-close" onClick={onClose}>×</button>
         </div>
         <p style={{ color: 'var(--text-tertiary)', fontSize: '13px', marginBottom: '16px' }}>
-          Integrate Quokka's specialized RAG synthesis API directly into your materials science notebooks.
+          Integrate Quokka&apos;s specialized RAG synthesis API directly into your materials science notebooks.
         </p>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           {snippets.map((snip, idx) => (
@@ -1677,7 +1680,7 @@ function BillingModal({ onClose }) {
               </span>
               <h3 style={{ margin: '12px 0 6px 0', color: 'var(--text-primary)', fontSize: '20px' }}>$29.00 <span style={{ fontSize: '13px', color: 'var(--text-tertiary)' }}>/ month</span></h3>
               <p style={{ margin: 0, fontSize: '12.5px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
-                Get full access to Quokka's concurrent materials science pipelines and custom API Key generation.
+                Get full access to Quokka&apos;s concurrent materials science pipelines and custom API Key generation.
               </p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>

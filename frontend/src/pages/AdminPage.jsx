@@ -19,6 +19,7 @@ export default function AdminPage({ onBack }) {
         fetchMetrics();
         fetchModelStatus();
         fetchLogs(1);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const fetchModelStatus = async () => {
@@ -26,7 +27,7 @@ export default function AdminPage({ onBack }) {
             const res = await fetch(`${API}/api/admin/model_status`, { headers: authHeaders });
             const data = await res.json();
             setModelStatus(data.status);
-        } catch (e) {
+        } catch {
             setModelStatus('offline');
         }
     };

@@ -2,6 +2,7 @@ require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') }
 const { HfInference } = require('@huggingface/inference');
 const Groq = require('groq-sdk');
 const QueryLog = require('./models/QueryLog');
+const { searchArxiv } = require('./mcp-client');
 
 class LiveRAGPipeline {
     constructor() {
@@ -141,6 +142,65 @@ class LiveRAGPipeline {
             context = "N/A (Greeting detected)";
         } else {
             try {
+                console.log("DEBUG: Checking if Arxiv search is required...");
+                const toolResponse = await this.groq.chat.completions.create({
+                    model: "llama-3.1-8b-instant",
+                    messages: [
+                        { role: "system", content: "You are an intelligent router. Determine if the user's query requires searching academic papers on Arxiv (e.g. they ask about a specific paper, recent research, authors, deep science). If yes, call the arxiv_search tool with a concise search query. If no, just output 'NO'." },
+                        { role: "user", content: queryText }
+                    ],
+                    tools: [
+                        {
+                            type: "function",
+                            function: {
+                                name: "arxiv_search",
+                                description: "Search Arxiv for academic papers",
+                                parameters: {
+                                    type: "object",
+                                    properties: {
+                                        query: { type: "string", description: "Search query for Arxiv" }
+                                    },
+                                    required: ["query"]
+                                }
+                            }
+                        }
+                    ],
+                    tool_choice: "auto",
+                    temperature: 0.1,
+                    max_tokens: 100
+                });
+                
+                const message = toolResponse.choices[0].message;
+                if (message.tool_calls && message.tool_calls.length > 0) {
+                    const toolCall = message.tool_calls[0];
+                    if (toolCall.function.name === "arxiv_search") {
+                        const args = JSON.parse(toolCall.function.arguments);
+                        console.log(`DEBUG: Arxiv search triggered by LLM: "${args.query}"`);
+                        const arxivResults = await searchArxiv(args.query, 3);
+                        
+                        try {
+                            const parsedArxiv = JSON.parse(arxivResults);
+                            if (Array.isArray(parsedArxiv)) {
+                                const arxivContextStr = parsedArxiv.map(p => `### Arxiv Source: ${p.title} (${p.published || 'Unknown'})\nAuthors: ${p.authors ? p.authors.join(', ') : 'Unknown'}\nAbstract: ${p.summary || p.abstract || ''}\nLink: ${p.id || p.link || ''}`).join("\n\n");
+                                context += arxivContextStr + "\n\n";
+                                sources.push(...parsedArxiv.map(p => `${p.title} (Arxiv)`));
+                            } else {
+                                context += `### Arxiv Results:\n${arxivResults}\n\n`;
+                                sources.push("Arxiv Search Results");
+                            }
+                        } catch(e) {
+                            context += `### Arxiv Results:\n${arxivResults}\n\n`;
+                            sources.push("Arxiv Search Results");
+                        }
+                    }
+                } else {
+                    console.log("DEBUG: LLM determined Arxiv search is not required.");
+                }
+            } catch(e) {
+                console.error("Arxiv tool-calling error:", e);
+            }
+
+            try {
                 // 1. Perform Live Web Search
                 const searchResults = await this.webSearch(queryText);
                 
@@ -224,21 +284,24 @@ class LiveRAGPipeline {
                     return;
                 }
 
-                context = hits.map(h => {
+                const qdrantContext = hits.map(h => {
                     const p = h.payload || {};
                     return `### Source: ${p.title} (${p.year})\nSnippet: ${p.text}\nLink: ${p.source}`;
                 }).join("\n\n");
+                context += qdrantContext;
 
                 const rawSources = hits.map(h => {
                     const p = h.payload || {};
                     return `${p.title} (${p.year})`;
                 });
-                sources = [...new Set(rawSources)].sort();
+                sources = [...new Set([...sources, ...rawSources])].sort();
 
             } catch (e) {
                 console.error(`❌ Live RAG pipeline retrieval error: ${e.message}`);
-                context = "Context unavailable due to retrieval issues.";
-                sources = [];
+                // Don't overwrite the arxiv context if there is one
+                if (!context) {
+                    context = "Context unavailable due to retrieval issues.";
+                }
             }
         }
 

@@ -149,7 +149,7 @@ ${context}`
         // ROUTE: Fine-tuned Qwen Model (via Hugging Face Space llama.cpp API)
         if (model === 'finetuned') {
             console.log("DEBUG: Routing to Fine-tuned Qwen Model API...");
-            const apiUrl = process.env.FINETUNED_API_URL || 'http://localhost:8001/v1/chat/completions';
+            const apiUrl = process.env.FINETUNED_API_URL || 'http://localhost:8080/v1/chat/completions';
             
             try {
                 yield `data: ${JSON.stringify({ type: 'sources', sources: [] })}\n\n`;
