@@ -11,7 +11,7 @@ import AdminPage from './pages/AdminPage';
 import { motion, AnimatePresence } from 'framer-motion';
 // removed confetti import
 
-const API = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API = import.meta.env.VITE_API_URL;
 
 function App() {
   const [theme, setTheme] = useState(() => {
