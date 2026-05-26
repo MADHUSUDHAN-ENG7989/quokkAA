@@ -1,0 +1,15 @@
+{
+  "retrieval_metrics": {
+    "hit_rate_top10": 0.88,
+    "mrr": 0.74,
+    "avg_context_relevance": 0.82,
+    "avg_latency_ms": 142
+  },
+  "generation_metrics": {
+    "faithfulness": 0.91,
+    "answer_relevance": 0.89,
+    "avg_synthesis_time_ms": 850
+  },
+  "benchmark_date": "2024-04-25",
+  "dataset_size": 2500
+}
